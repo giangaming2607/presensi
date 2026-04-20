@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogIn, User as UserIcon, QrCode, Scan, Users, BookOpen, GraduationCap, ChevronRight, LogOut, LayoutDashboard, Calendar, Download, Printer, Trash2, Keyboard, FileSpreadsheet, Settings, RotateCcw, Palette, Image as ImageIcon } from 'lucide-react';
+import { LogIn, User as UserIcon, QrCode, Scan, Users, BookOpen, GraduationCap, ChevronRight, LogOut, LayoutDashboard, Calendar, Download, Printer, Trash2, Keyboard, FileSpreadsheet, Settings, RotateCcw, Palette, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import QRCode from 'react-qr-code';
@@ -7,6 +7,22 @@ import * as XLSX from 'xlsx';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { User, UserRole, Attendance } from './types';
+import { db, auth } from './firebase';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  addDoc, 
+  Timestamp,
+  orderBy
+} from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -27,77 +43,145 @@ const callGAS = (fnName: string, ...args: any[]): Promise<any> => {
 const api = {
   login: async (id: string, pass: string) => {
     if (isGAS) return callGAS('loginUser', id, pass);
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, password: pass })
-    });
-    return res.json();
+    
+    // Firebase Implementation
+    try {
+      // 1. Check if user exists in Firestore first (to check role)
+      const userDoc = await getDoc(doc(db, 'users', id));
+      if (!userDoc.exists()) return { success: false, message: 'User tidak ditemukan' };
+      
+      const userData = userDoc.data() as User;
+      if (userData.password !== pass) return { success: false, message: 'Password salah' };
+      
+      // 2. Sign in to Firebase Auth (using a dummy email mapped from ID)
+      // Note: In production you should properly register users in Auth
+      // Here we assume they exist or we use a fixed email per ID
+      const email = `${id}@eduabsen.local`;
+      try {
+         await signInWithEmailAndPassword(auth, email, pass);
+      } catch (e) {
+         // Silently fail auth if not registered, but we still allow session for demo
+         console.warn("Auth sign-in failed, continuing with Firestore session only.");
+      }
+
+      return { success: true, user: userData };
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
   },
-  getUsers: () => {
+  getUsers: async () => {
     if (isGAS) return callGAS('getUsers');
-    return fetch('/api/users').then(r => r.json());
+    const q = query(collection(db, 'users'), orderBy('nama', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.data() as User);
   },
-  getAbsensi: () => {
+  getAbsensi: async () => {
     if (isGAS) return callGAS('getAbsensi');
-    return fetch('/api/absensi').then(r => r.json());
+    const q = query(collection(db, 'absensi'), orderBy('tanggal', 'desc'), orderBy('jamMasuk', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Attendance));
   },
-  scan: (id: string, mode: string) => {
+  scan: async (id: string, mode: string) => {
     if (isGAS) return callGAS('processScan', id, mode);
-    return fetch('/api/absensi', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, mode })
-    }).then(r => r.json());
+    
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+
+    // Find student
+    const studentDoc = await getDoc(doc(db, 'users', id));
+    if (!studentDoc.exists() || studentDoc.data()?.role !== 'Siswa') {
+      return { success: false, message: 'Siswa tidak ditemukan' };
+    }
+    const student = studentDoc.data() as User;
+
+    // Check existing
+    const q = query(collection(db, 'absensi'), where('nisn', '==', id), where('tanggal', '==', today));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      const docRef = doc(db, 'absensi', snapshot.docs[0].id);
+      const existing = snapshot.docs[0].data() as Attendance;
+
+      if (mode === 'masuk') {
+        return { success: false, message: 'Siswa sudah absen masuk hari ini' };
+      }
+
+      if (mode === 'pulang') {
+        if (existing.jamPulang) return { success: false, message: 'Siswa sudah absen pulang' };
+        await updateDoc(docRef, { jamPulang: now });
+        return { success: true, action: 'pulang', data: { ...existing, jamPulang: now } };
+      }
+    } else {
+      if (mode === 'pulang') return { success: false, message: 'Siswa belum absen masuk' };
+      
+      const newEntry = {
+        nisn: student.id,
+        nama: student.nama,
+        tanggal: today,
+        jamMasuk: now,
+        jamPulang: null
+      };
+      const docRef = await addDoc(collection(db, 'absensi'), newEntry);
+      return { success: true, action: 'masuk', data: { ...newEntry, id: docRef.id } };
+    }
   },
-  getMetadata: () => {
-    if (isGAS) return callGAS('getMetadata');
-    return fetch('/api/metadata').then(r => r.json());
-  },
-  addUser: (user: any) => {
+  addUser: async (user: any) => {
     if (isGAS) return callGAS('addUser', user);
-    return fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(user)
-    }).then(r => r.json());
+    await setDoc(doc(db, 'users', user.id), user);
+    return { success: true, user };
   },
-  addMetadata: (type: string, data: any) => {
-    if (isGAS) return callGAS('addMetadata', type, data);
-    return fetch(`/api/metadata/${type}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => r.json());
-  },
-  deleteAbsensi: (id: string) => {
+  deleteAbsensi: async (id: string) => {
     if (isGAS) return callGAS('deleteAbsensi', id);
-    return fetch(`/api/absensi/${id}`, { method: 'DELETE' }).then(r => r.json());
+    await deleteDoc(doc(db, 'absensi', id));
+    return { success: true };
   },
-  resetToday: () => {
+  resetToday: async () => {
     if (isGAS) return callGAS('resetToday');
-    return fetch('/api/absensi/reset-today', { method: 'POST' }).then(r => r.json());
+    const today = new Date().toISOString().split('T')[0];
+    const q = query(collection(db, 'absensi'), where('tanggal', '==', today));
+    const snapshot = await getDocs(q);
+    let count = 0;
+    for (const d of snapshot.docs) {
+      await deleteDoc(doc(db, 'absensi', d.id));
+      count++;
+    }
+    return { success: true, count };
   },
-  changePassword: (data: any) => {
-    if (isGAS) return callGAS('changePassword', data.userId, data.oldPassword, data.newPassword);
-    return fetch('/api/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => r.json());
-  },
-  getBranding: () => {
+  getBranding: async () => {
     if (isGAS) return callGAS('getBranding');
-    return fetch('/api/branding').then(r => r.json());
+    const docSnap = await getDoc(doc(db, 'branding', 'config'));
+    if (docSnap.exists()) return docSnap.data();
+    return { appName: 'EduAbsen', logoUrl: '' };
   },
-  updateBranding: (data: any) => {
+  updateBranding: async (data: any) => {
     if (isGAS) return callGAS('updateBranding', data.appName, data.logoUrl);
-    return fetch('/api/branding', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => r.json());
+    await setDoc(doc(db, 'branding', 'config'), { appName: data.appName, logoUrl: data.logoUrl });
+    return { success: true };
   },
+  changePassword: async (data: any) => {
+    if (isGAS) return callGAS('changePassword', data.userId, data.oldPassword, data.newPassword);
+    const userRef = doc(db, 'users', data.userId);
+    await updateDoc(userRef, { password: data.newPassword });
+    return { success: true };
+  },
+  getMetadata: async () => {
+    if (isGAS) return callGAS('getMetadata');
+    const q = query(collection(db, 'metadata'));
+    const snap = await getDocs(q);
+    const result: any = { kelas: [], guru: [], waliKelas: [] };
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (data.type === 'kelas') result.kelas.push({ ...data, id: d.id });
+      if (data.type === 'guru') result.guru.push({ ...data, id: d.id });
+      if (data.type === 'waliKelas') result.waliKelas.push({ ...data, id: d.id });
+    });
+    return result;
+  },
+  addMetadata: async (type: string, data: any) => {
+    if (isGAS) return callGAS('addMetadata', type, data);
+    await addDoc(collection(db, 'metadata'), { ...data, type });
+    return { success: true };
+  }
 };
 
 // --- COMPONENTS ---
@@ -161,9 +245,20 @@ export default function App() {
   };
 
   useEffect(() => {
+    const seedAdmin = async () => {
+      const branding = await api.getBranding();
+      setBranding(branding);
+      
+      const res = await api.getUsers();
+      if (res.length === 0) {
+        await api.addUser({ id: 'admin', nama: 'Administrator', role: 'Admin', password: 'admin' });
+        await api.addUser({ id: 'petugas', nama: 'Petugas Scan', role: 'Petugas Scan', password: 'scan' });
+      }
+    };
+
     const saved = localStorage.getItem('user');
     if (saved) setCurrentUser(JSON.parse(saved));
-    fetchBranding();
+    seedAdmin();
   }, []);
 
   const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
@@ -351,9 +446,11 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
 
 function Dashboard({ user, branding }: { user: User, branding: any }) {
   const [stats, setStats] = useState({ totalSiswa: 0, absenHariIni: 0 });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchStats = async () => {
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
       const users = await api.getUsers();
       const absensi = await api.getAbsensi();
       const today = new Date().toISOString().split('T')[0];
@@ -361,7 +458,12 @@ function Dashboard({ user, branding }: { user: User, branding: any }) {
         totalSiswa: users.filter((u: any) => u.role === 'Siswa').length,
         absenHariIni: absensi.filter((a: any) => a.tanggal === today).length
       });
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchStats();
   }, []);
 
@@ -371,7 +473,16 @@ function Dashboard({ user, branding }: { user: User, branding: any }) {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
         <div className="relative z-10">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
-            <span className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest mb-6 inline-block">Sistem {branding.appName}</span>
+            <div className="flex items-center justify-between mb-6">
+              <span className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest inline-block">Sistem {branding.appName}</span>
+              <button 
+                onClick={fetchStats} 
+                disabled={loading}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw size={18} className={cn(loading && "animate-spin")} />
+              </button>
+            </div>
             <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tight leading-tight">Halo, {user.nama}!</h1>
             <p className="text-blue-100 text-lg max-w-xl opacity-90">Selamat datang kembali di dashboard utama. Pantau kehadiran siswa dan staf secara real-time dengan presisi digital.</p>
           </motion.div>
@@ -458,8 +569,13 @@ function AdminStudents({ showMsg }: any) {
   const [loading, setLoading] = useState(false);
 
   const fetchStudents = async () => {
-    const data = await api.getUsers();
-    setStudents(data.filter((u: any) => u.role === 'Siswa'));
+    setLoading(true);
+    try {
+      const data = await api.getUsers();
+      setStudents(data.filter((u: any) => u.role === 'Siswa'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchStudents(); }, []);
@@ -468,19 +584,24 @@ function AdminStudents({ showMsg }: any) {
     e.preventDefault();
     setLoading(true);
     const res = await api.addUser({ id: nisn, nama, kelas, role: 'Siswa', password: '123' });
-    setLoading(false);
     if (res.success) {
       showMsg('Siswa berhasil ditambahkan');
       setNisn(''); setNama(''); setKelas('');
       fetchStudents();
     } else {
       showMsg(res.message, 'error');
+      setLoading(false);
     }
   };
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900">Manajemen Siswa</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">Manajemen Siswa</h2>
+        <Button onClick={fetchStudents} disabled={loading} variant="secondary" className="px-3">
+          <RefreshCw size={18} className={cn(loading && "animate-spin")} />
+        </Button>
+      </div>
       
       <Card title="Tambah Siswa Baru">
         <form onSubmit={addStudent} className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
@@ -523,11 +644,48 @@ function AdminStudents({ showMsg }: any) {
 
 function AttendanceView() {
   const [records, setRecords] = useState<Attendance[]>([]);
-  const fetchRecords = async () => setRecords(await api.getAbsensi());
+  const [loading, setLoading] = useState(false);
+  
+  const fetchRecords = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getAbsensi();
+      setRecords(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => { fetchRecords(); }, []);
 
+  const handleResetToday = async () => {
+    if (!confirm('PERINGATAN: Ini akan menghapus SELURUH data absen hari ini. Semua siswa harus absen ulang dari awal. Lanjutkan?')) return;
+    setLoading(true);
+    try {
+      const res = await api.resetToday();
+      if (res.success) {
+        alert(`Berhasil menghapus ${res.count} data hari ini.`);
+        fetchRecords();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+    if (!confirm('Hapus data absensi ini? Siswa ini bisa melakukan absen kembali setelah dihapus.')) return;
+    setLoading(true);
+    try {
+      const res = await api.deleteAbsensi(id);
+      if (res.success) {
+        fetchRecords();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const exportToExcel = () => {
-    // Transform data for excel
     const dataToExport = records.map(r => ({
       'Nama Siswa': r.nama,
       'NISN': r.nisn,
@@ -540,72 +698,82 @@ function AttendanceView() {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data Absensi");
-
-    // Set column widths
-    const wscols = [
-      { wch: 25 }, // Nama
-      { wch: 15 }, // NISN
-      { wch: 15 }, // Tanggal
-      { wch: 12 }, // Masuk
-      { wch: 12 }, // Pulang
-      { wch: 15 }, // Status
-    ];
-    worksheet['!cols'] = wscols;
-
-    // Trigger download
     XLSX.writeFile(workbook, `Laporan_Absensi_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Rekap Absensi</h2>
-          <p className="text-gray-500 text-sm">Riwayat kehadiran seluruh siswa.</p>
+          <p className="text-gray-500 text-sm">Riwayat kehadiran seluruh siswa secara real-time.</p>
         </div>
-        <Button onClick={exportToExcel} className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100 w-full sm:w-auto">
-          <FileSpreadsheet size={18} /> Export Excel
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button onClick={fetchRecords} disabled={loading} variant="secondary" className="px-3">
+             <RefreshCw size={18} className={cn(loading && "animate-spin")} />
+          </Button>
+          <Button onClick={handleResetToday} disabled={loading} variant="danger" className="text-xs bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-100 shadow-none">
+             <RotateCcw size={16} /> Reset Hari Ini
+          </Button>
+          <Button onClick={exportToExcel} className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100">
+            <FileSpreadsheet size={18} /> Export Excel
+          </Button>
+        </div>
       </div>
 
-      <Card>
+      <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b text-gray-400 text-xs uppercase font-bold">
-                <th className="py-4 px-2">Nama Siswa</th>
-                <th className="py-4 px-2 font-mono">NISN</th>
-                <th className="py-4 px-2">Tanggal</th>
-                <th className="py-4 px-2">Masuk</th>
-                <th className="py-4 px-2">Pulang</th>
+              <tr className="bg-gray-50/50 border-b text-gray-400 text-[10px] uppercase font-black tracking-widest">
+                <th className="py-4 px-6">Nama Siswa</th>
+                <th className="py-4 px-6 font-mono text-center">NISN</th>
+                <th className="py-4 px-6 text-center">Tanggal</th>
+                <th className="py-4 px-6 text-center text-blue-600">Masuk</th>
+                <th className="py-4 px-6 text-center text-orange-600">Pulang</th>
+                <th className="py-4 px-6 text-center">Aksi</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
-              {records.map((r) => (
-                <tr key={r.id} className="border-b transition-all hover:bg-gray-50/50">
-                  <td className="py-4 px-2">
-                    <div className="font-bold text-gray-900">{r.nama}</div>
+            <tbody className="text-sm divide-y divide-gray-50">
+              {records.slice().reverse().map((r) => (
+                <tr key={r.id} className="transition-all hover:bg-blue-50/20">
+                  <td className="py-4 px-6">
+                    <div className="font-bold text-gray-800">{r.nama}</div>
                   </td>
-                  <td className="py-4 px-2">
-                    <span className="font-mono text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{r.nisn}</span>
+                  <td className="py-4 px-6 text-center">
+                    <span className="font-mono text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">{r.nisn}</span>
                   </td>
-                  <td className="py-4 px-2 text-gray-600">{r.tanggal}</td>
-                  <td className="py-4 px-2">
-                    <span className="text-green-600 font-bold bg-green-50 px-2 py-1 rounded-lg text-xs">{r.jamMasuk}</span>
+                  <td className="py-4 px-6 text-center text-gray-500 font-medium">{r.tanggal}</td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="text-blue-600 font-black bg-blue-50 px-3 py-1.5 rounded-xl text-xs">{r.jamMasuk}</span>
                   </td>
-                  <td className="py-4 px-2">
+                  <td className="py-4 px-6 text-center">
                     <span className={cn(
-                      "font-bold px-2 py-1 rounded-lg text-xs",
-                      r.jamPulang ? "text-orange-600 bg-orange-50" : "text-gray-400 bg-gray-50"
+                      "font-black px-3 py-1.5 rounded-xl text-xs",
+                      r.jamPulang ? "text-orange-600 bg-orange-50" : "text-gray-300 bg-gray-50 italic"
                     )}>
                       {r.jamPulang || '--:--'}
                     </span>
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <button 
+                      onClick={() => handleDeleteRecord(r.id)}
+                      disabled={loading}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </td>
                 </tr>
               ))}
               {records.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-400 italic">Belum ada data absensi yang tercatat.</td>
+                  <td colSpan={5} className="py-24 text-center">
+                    <div className="flex flex-col items-center gap-3 grayscale opacity-30">
+                      <FileSpreadsheet size={48} />
+                      <p className="font-bold text-gray-400">Belum ada data absensi tercatat.</p>
+                    </div>
+                  </td>
                 </tr>
               )}
             </tbody>

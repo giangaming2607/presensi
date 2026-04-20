@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() { return isSignedIn() && getUserData().role == 'Admin'; }
+    function isPetugas() { return isSignedIn() && (getUserData().role == 'Petugas Scan' || getUserData().role == 'Admin'); }
+
+    // Users Collection
+    match /users/{userId} {
+      // Anyone can read a specific user doc for profile/login verification if they are that user
+      // Or Admin can read all
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      
+      // Only Admin can create/update users
+      // During creation, we check schema
+      allow create, update: if isAdmin() && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+
+      function isValidUser(data) {
+        return data.keys().hasAll(['id', 'nama', 'role', 'password']) &&
+               data.id is string && data.id.size() <= 50 &&
+               data.nama is string && data.nama.size() <= 100 &&
+               data.role in ['Admin', 'Petugas Scan', 'Siswa', 'Guru'] &&
+               data.password is string && data.password.size() <= 100;
+      }
+    }
+
+    // Attendance Collection
+    match /absensi/{attendanceId} {
+      // List for logged in users (Admin/Petugas sees all, Students should be filtered by query but we enforce here)
+      allow list: if isSignedIn() && (isPetugas() || resource.data.nisn == getUserData().id);
+      allow get: if isSignedIn() && (isPetugas() || resource.data.nisn == getUserData().id);
+
+      // Only Petugas or Admin can write
+      allow create: if isPetugas() && isValidId(attendanceId) && isValidAttendance(request.resource.data);
+      allow update: if isPetugas() && isValidAttendance(request.resource.data) 
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['jamPulang']);
+      allow delete: if isAdmin();
+
+      function isValidAttendance(data) {
+        return data.nisn is string && data.nisn.size() <= 50 &&
+               data.nama is string && data.nama.size() <= 100 &&
+               data.tanggal is string && data.tanggal.size() == 10;
+      }
+    }
+
+    // Branding Collection
+    match /branding/config {
+      allow read: if true; // Publicly accessible for UI
+      allow write: if isAdmin();
+    }
+  }
+}

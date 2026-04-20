@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System users including students, teachers, and admins.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "NISN or identification number" },
+        "nama": { "type": "string" },
+        "kelas": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Petugas Scan", "Siswa", "Guru"] },
+        "password": { "type": "string" }
+      },
+      "required": ["id", "nama", "role", "password"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Attendance logs for students.",
+      "type": "object",
+      "properties": {
+        "nisn": { "type": "string" },
+        "nama": { "type": "string" },
+        "tanggal": { "type": "string", "format": "date" },
+        "jamMasuk": { "type": "string" },
+        "jamPulang": { "type": "string" }
+      },
+      "required": ["nisn", "nama", "tanggal", "jamMasuk"]
+    },
+    "Branding": {
+      "title": "Branding",
+      "description": "Application customization settings.",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "logoUrl": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Collection of people who can log in."
+    },
+    "absensi/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Attendance records."
+    },
+    "branding/config": {
+      "schema": "Branding",
+      "description": "Global application configuration."
+    }
+  }
+}
