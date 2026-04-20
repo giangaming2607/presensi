@@ -1,0 +1,6 @@
+{
+  "name": "Sistem Absensi QR Sekolah",
+  "description": "Sistem absensi sekolah berbasis QR Code untuk Siswa, Guru, dan Admin. Fitur scan QR, manajemen user, dan rekapitulasi data.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
