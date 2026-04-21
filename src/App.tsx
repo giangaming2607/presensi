@@ -151,7 +151,22 @@ const api = {
     if (isGAS) return callGAS('getBranding');
     const docSnap = await getDoc(doc(db, 'branding', 'config'));
     if (docSnap.exists()) return docSnap.data();
-    return { appName: 'EduAbsen', logoUrl: '', announcements: [] };
+    return { 
+      appName: 'EduAbsen', 
+      logoUrl: '', 
+      announcements: [], 
+      themeColor: '#2563eb',
+      uiStyle: {
+        radius: 24,
+        borderWidth: 1,
+        shadowIntensity: 'soft',
+        glassBlur: 0,
+        bgOpacity: 1,
+        fontFamily: 'sans',
+        spacing: 'default',
+        designMode: 'modern'
+      }
+    };
   },
   saveSubjectAbsensi: async (data: any) => {
     if (isGAS) return callGAS('saveSubjectAbsensi', data);
@@ -180,11 +195,22 @@ const api = {
     return snapshot.docs.map(d => d.data() as User).sort((a, b) => a.nama.localeCompare(b.nama));
   },
   updateBranding: async (data: any) => {
-    if (isGAS) return callGAS('updateBranding', data.appName, data.logoUrl, data.announcements);
+    if (isGAS) return callGAS('updateBranding', data.appName, data.logoUrl, data.announcements, data.themeColor, data.uiStyle);
     await setDoc(doc(db, 'branding', 'config'), { 
       appName: data.appName, 
       logoUrl: data.logoUrl,
-      announcements: data.announcements || []
+      announcements: data.announcements || [],
+      themeColor: data.themeColor || '#2563eb',
+      uiStyle: data.uiStyle || {
+        radius: 24,
+        borderWidth: 1,
+        shadowIntensity: 'soft',
+        glassBlur: 0,
+        bgOpacity: 1,
+        fontFamily: 'sans',
+        spacing: 'default',
+        designMode: 'modern'
+      }
     }, { merge: true });
     return { success: true };
   },
@@ -235,9 +261,14 @@ const Card = ({ children, className, title }: any) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className={cn("bg-white rounded-2xl p-6 shadow-sm border border-gray-100", className)}
+    className={cn(
+      "rounded-[var(--ui-radius)] p-[var(--ui-padding)] shadow-[var(--ui-shadow)] border-[length:var(--ui-border_width)] border-gray-100", 
+      "backdrop-blur-[var(--ui-glass-blur)]",
+      className
+    )}
+    style={{ backgroundColor: `rgba(255, 255, 255, var(--ui-bg-opacity))` }}
   >
-    {title && <h3 className="text-lg font-semibold mb-4 text-gray-900">{title}</h3>}
+    {title && <h3 className="text-lg font-black mb-4 text-gray-900 tracking-tight">{title}</h3>}
     {children}
   </motion.div>
 );
@@ -245,7 +276,7 @@ const Card = ({ children, className, title }: any) => (
 const Button = ({ children, onClick, variant = 'primary', className, disabled, type = 'button' }: any) => {
   const variants = {
     primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200",
-    secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 shadow-gray-100",
+    secondary: "bg-black/5 text-gray-900 hover:bg-black/10 shadow-none border border-transparent",
     danger: "bg-red-600 text-white hover:bg-red-700 shadow-red-200",
     orange: "bg-orange-600 text-white hover:bg-orange-700 shadow-orange-200",
   };
@@ -255,22 +286,23 @@ const Button = ({ children, onClick, variant = 'primary', className, disabled, t
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "px-4 py-2 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2",
+        "px-[calc(var(--ui-padding)/1.5)] py-[calc(var(--ui-padding)/2)] rounded-[calc(var(--ui-radius)/1.5)] font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2",
         variants[variant as keyof typeof variants],
         className
       )}
+      style={{ borderWidth: `var(--ui-border-width)` }}
     >
       {children}
     </button>
   );
 };
 
-const Input = ({ label, ...props }: any) => (
-  <div className="space-y-1.5">
-    {label && <label className="text-sm font-medium text-gray-700 ml-1">{label}</label>}
+const Input = ({ label, className, ...props }: any) => (
+  <div className={cn("space-y-1.5", className)}>
+    {label && <label className="text-[10px] uppercase font-black tracking-widest text-gray-400 ml-1">{label}</label>}
     <input
       {...props}
-      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+      className="w-full px-4 h-12 rounded-[calc(var(--ui-radius)/2)] border-[length:var(--ui-border-width)] border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
     />
   </div>
 );
@@ -321,7 +353,22 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [statusModal, setStatusModal] = useState<{ show: boolean, type: 'success' | 'error', title: string, message: string }>({ show: false, type: 'success', title: '', message: '' });
-  const [branding, setBranding] = useState({ appName: 'EduAbsen', logoUrl: '', announcements: [] as any[] });
+  const [branding, setBranding] = useState({ 
+    appName: 'EduAbsen', 
+    logoUrl: '', 
+    announcements: [] as any[], 
+    themeColor: '#2563eb',
+    uiStyle: {
+      radius: 24,
+      borderWidth: 1,
+      shadowIntensity: 'soft',
+      glassBlur: 0,
+      bgOpacity: 1,
+      fontFamily: 'sans',
+      spacing: 'default',
+      designMode: 'modern'
+    } as any
+  });
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   const fetchBranding = async () => {
@@ -377,6 +424,95 @@ export default function App() {
       }
       link.href = branding.logoUrl;
     }
+    
+    // Theme Injection
+    const applyTheme = (color: string) => {
+      const root = document.documentElement;
+      let h: number, s: number, l: number;
+      const targetColor = color || '#2563eb';
+      
+      if (targetColor.startsWith('hsl')) {
+        const matches = targetColor.match(/\d+(\.\d+)?/g);
+        if (matches) {
+          h = parseFloat(matches[0]);
+          s = parseFloat(matches[1]);
+          l = parseFloat(matches[2]);
+        } else {
+          [h, s, l] = [217, 91, 60]; // fallback
+        }
+      } else {
+        // Helper to convert hex to HSL
+        const hexToHsl = (hex: string) => {
+          let r = parseInt(hex.slice(1, 3), 16) / 255;
+          let g = parseInt(hex.slice(3, 5), 16) / 255;
+          let b = parseInt(hex.slice(5, 7), 16) / 255;
+          let max = Math.max(r, g, b), min = Math.min(r, g, b);
+          let h = 0, s, l = (max + min) / 2;
+          if (max === min) h = s = 0;
+          else {
+            let d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+              case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+              case g: h = (b - r) / d + 2; break;
+              case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+          }
+          return [h * 360, s * 100, l * 100];
+        };
+        [h, s, l] = hexToHsl(targetColor);
+      }
+      
+      // Override Tailwind Blue variables
+      root.style.setProperty('--color-blue-50', `hsl(${h}, ${s}%, 97%)`);
+      root.style.setProperty('--color-blue-100', `hsl(${h}, ${s}%, 93%)`);
+      root.style.setProperty('--color-blue-200', `hsl(${h}, ${s}%, 85%)`);
+      root.style.setProperty('--color-blue-300', `hsl(${h}, ${s}%, 75%)`);
+      root.style.setProperty('--color-blue-400', `hsl(${h}, ${s}%, 60%)`);
+      root.style.setProperty('--color-blue-500', `hsl(${h}, ${s}%, 50%)`);
+      root.style.setProperty('--color-blue-600', `hsl(${h}, ${s}%, 45%)`);
+      root.style.setProperty('--color-blue-700', `hsl(${h}, ${s}%, 38%)`);
+      root.style.setProperty('--color-blue-800', `hsl(${h}, ${s}%, 30%)`);
+      root.style.setProperty('--color-blue-900', `hsl(${h}, ${s}%, 20%)`);
+      
+      root.style.setProperty('--primary', `hsl(${h}, ${s}%, ${l}%)`);
+    };
+
+    // UI Style Injection
+    const applyUIStyle = (style: any) => {
+      const root = document.documentElement;
+      const s = style || { radius: 24, borderWidth: 1, shadowIntensity: 'soft', glassBlur: 0, bgOpacity: 1, fontFamily: 'sans', spacing: 'default' };
+      
+      root.style.setProperty('--ui-radius', `${s.radius}px`);
+      root.style.setProperty('--ui-border-width', `${s.borderWidth}px`);
+      root.style.setProperty('--ui-glass-blur', `${s.glassBlur}px`);
+      root.style.setProperty('--ui-bg-opacity', `${s.bgOpacity}`);
+      
+      // Shadow logic
+      let shadow = 'none';
+      if (s.shadowIntensity === 'soft') shadow = '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)';
+      if (s.shadowIntensity === 'medium') shadow = '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)';
+      if (s.shadowIntensity === 'hard') shadow = '0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.2)';
+      if (s.shadowIntensity === 'glow') shadow = `0 10px 30px -5px ${branding.themeColor}44`;
+      root.style.setProperty('--ui-shadow', shadow);
+      
+      // Spacing logic
+      let padding = '1.5rem';
+      if (s.spacing === 'tight') padding = '1rem';
+      if (s.spacing === 'loose') padding = '2.5rem';
+      root.style.setProperty('--ui-padding', padding);
+
+      // Font logic
+      let font = '"Inter", ui-sans-serif, system-ui, sans-serif';
+      if (s.fontFamily === 'serif') font = '"Cormorant Garamond", "Georgia", serif';
+      if (s.fontFamily === 'mono') font = '"JetBrains Mono", "Fira Code", monospace';
+      root.style.setProperty('--font-sans', font);
+      document.body.style.fontFamily = font;
+    };
+
+    applyTheme(branding.themeColor);
+    applyUIStyle(branding.uiStyle);
   }, [branding]);
 
   const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
@@ -408,30 +544,37 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 flex relative">
       {/* Sidebar Desktop */}
       <aside className={cn(
-        "bg-white border-r border-gray-100 flex flex-col transition-all duration-300 z-30",
-        sidebarOpen ? "w-64 p-6" : "w-0 p-0 overflow-hidden opacity-0 border-none",
-        "hidden md:flex"
-      )}>
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3 px-2 overflow-hidden">
+        "bg-white border-r border-gray-100 flex flex-col transition-all duration-500 z-30",
+        sidebarOpen ? "w-72 p-8" : "w-0 p-0 overflow-hidden opacity-0 border-none",
+        "hidden md:flex",
+        "backdrop-blur-[var(--ui-glass-blur)]"
+      )}
+      style={{ backgroundColor: `rgba(255, 255, 255, var(--ui-bg-opacity))` }}
+      >
+        <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center gap-4 px-2 overflow-hidden">
             {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt="Logo" className="w-10 h-10 min-w-[40px] object-contain rounded-xl" referrerPolicy="no-referrer" />
+              <img src={branding.logoUrl} alt="Logo" className="w-12 h-12 min-w-[48px] object-contain rounded-[calc(var(--ui-radius)/2)] shadow-xl shadow-blue-500/10" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-10 h-10 min-w-[40px] bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                <GraduationCap size={24} />
+              <div className="w-12 h-12 min-w-[48px] bg-blue-600 rounded-[calc(var(--ui-radius)/2)] flex items-center justify-center text-white shadow-xl shadow-blue-200">
+                <GraduationCap size={28} />
               </div>
             )}
-            <span className="font-bold text-xl tracking-tight text-gray-900 truncate">{branding.appName}</span>
+            <div className="flex flex-col">
+              <span className="font-black text-2xl tracking-tighter text-gray-900 truncate leading-none">{branding.appName}</span>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Smart Attendance</span>
+            </div>
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1 flex-1">
-          <NavBtn icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+        <nav className="flex flex-col gap-2 flex-1">
+          <NavBtn icon={<LayoutDashboard size={22} />} label="Overview" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           
           {currentUser.role === 'Admin' && (
             <>
               <NavBtn icon={<Users size={20} />} label="Data Siswa" active={activeTab === 'siswa'} onClick={() => setActiveTab('siswa')} />
               <NavBtn icon={<QrCode size={20} />} label="Cetak QR" active={activeTab === 'print_qr'} onClick={() => setActiveTab('print_qr')} />
+              <NavBtn icon={<Palette size={20} />} label="Custom UI" active={activeTab === 'custom_ui'} onClick={() => setActiveTab('custom_ui')} />
               <NavBtn icon={<Calendar size={20} />} label="Data Absensi" active={activeTab === 'absensi'} onClick={() => setActiveTab('absensi')} />
               <NavBtn icon={<BookOpen size={20} />} label="Laporan Mapel" active={activeTab === 'subject_absensi_admin'} onClick={() => setActiveTab('subject_absensi_admin')} />
               <NavBtn icon={<Settings size={20} />} label="Data Master" active={activeTab === 'master'} onClick={() => setActiveTab('master')} />
@@ -513,6 +656,7 @@ export default function App() {
             <>
               <NavBtn icon={<Users size={20} />} label="Data Siswa" active={activeTab === 'siswa'} onClick={() => { setActiveTab('siswa'); setSidebarOpen(false); }} />
               <NavBtn icon={<QrCode size={20} />} label="Cetak QR" active={activeTab === 'print_qr'} onClick={() => { setActiveTab('print_qr'); setSidebarOpen(false); }} />
+              <NavBtn icon={<Palette size={20} />} label="Custom UI" active={activeTab === 'custom_ui'} onClick={() => { setActiveTab('custom_ui'); setSidebarOpen(false); }} />
               <NavBtn icon={<Calendar size={20} />} label="Data Absensi" active={activeTab === 'absensi'} onClick={() => { setActiveTab('absensi'); setSidebarOpen(false); }} />
               <NavBtn icon={<BookOpen size={20} />} label="Laporan Mapel" active={activeTab === 'subject_absensi_admin'} onClick={() => { setActiveTab('subject_absensi_admin'); setSidebarOpen(false); }} />
               <NavBtn icon={<Settings size={20} />} label="Data Master" active={activeTab === 'master'} onClick={() => { setActiveTab('master'); setSidebarOpen(false); }} />
@@ -547,10 +691,10 @@ export default function App() {
         {/* Toggle Button Global (Desktop) */}
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="hidden md:flex fixed top-8 z-50 px-3 py-3 bg-white hover:bg-gray-50 rounded-xl shadow-xl border border-gray-100 text-gray-600 transition-all hover:scale-110 active:scale-95"
-          style={{ left: sidebarOpen ? '240px' : '32px' }}
+          className="hidden md:flex fixed top-8 z-50 px-4 py-4 bg-white hover:bg-gray-50 rounded-[calc(var(--ui-radius)/2)] shadow-[var(--ui-shadow)] border-[length:var(--ui-border-width)] border-gray-100 text-gray-600 transition-all hover:scale-110 active:scale-95"
+          style={{ left: sidebarOpen ? '264px' : '32px' }}
         >
-          {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
         <div className="max-w-6xl mx-auto pt-12 md:pt-0">
@@ -584,6 +728,7 @@ export default function App() {
             {activeTab === 'absensi' && <AttendanceView />}
             {activeTab === 'subject_absensi_admin' && <SubjectAttendanceAdminView />}
             {activeTab === 'master' && <DataMaster showMsg={showMsg} showStatus={showStatus} />}
+            {activeTab === 'custom_ui' && <CustomUIPage branding={branding} setBranding={setBranding} showMsg={showMsg} />}
             {activeTab === 'scanner' && <ScannerPage showMsg={showMsg} showStatus={showStatus} branding={branding} />}
             {activeTab === 'myqr' && <StudentQR user={currentUser} branding={branding} />}
             {activeTab === 'settings' && <SettingsPage user={currentUser} branding={branding} setBranding={setBranding} showMsg={showMsg} showStatus={showStatus} onLogout={logout} />}
@@ -621,16 +766,19 @@ function NavBtn({ icon, label, active, onClick }: any) {
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 px-3 py-3 rounded-xl font-medium transition-all group",
+        "w-full flex items-center gap-4 px-5 py-4 rounded-[calc(var(--ui-radius)/1.8)] transition-all duration-300 group relative",
         active 
-          ? "bg-blue-50 text-blue-600 shadow-sm" 
-          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-[1.02]" 
+          : "text-gray-500 hover:bg-gray-100/80 hover:text-blue-600"
       )}
     >
-      <span className={cn("transition-colors", active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600")}>
+      <div className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-gray-400 group-hover:text-blue-600")}>
         {icon}
-      </span>
-      {label}
+      </div>
+      <span className="font-black text-sm uppercase tracking-widest">{label}</span>
+      {active && (
+        <motion.div layoutId="active-nav" className="absolute right-4 w-1.5 h-1.5 bg-white rounded-full" />
+      )}
     </button>
   );
 }
@@ -657,32 +805,44 @@ function Login({ onLogin, branding }: { onLogin: (u: User) => void, branding: an
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="mb-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Decorative Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[100px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[100px]" />
+
+      <Card className="w-full max-w-md p-10 z-10">
+        <div className="text-center mb-10">
+          <div className="mb-6">
             {branding.logoUrl ? (
-              <img src={branding.logoUrl} alt="Logo" className="w-16 h-16 mx-auto object-contain rounded-2xl shadow-xl shadow-blue-100" referrerPolicy="no-referrer" />
+              <img src={branding.logoUrl} alt="Logo" className="w-20 h-20 mx-auto object-contain rounded-[calc(var(--ui-radius)/2)] shadow-2xl shadow-blue-500/20" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-200 mx-auto">
-                <GraduationCap size={32} />
+              <div className="w-20 h-20 bg-blue-600 rounded-[calc(var(--ui-radius)/2)] flex items-center justify-center text-white shadow-2xl shadow-blue-500/30 mx-auto transform hover:rotate-12 transition-transform">
+                <GraduationCap size={40} />
               </div>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Selamat Datang</h1>
-          <p className="text-gray-500">Silakan login ke sistem {branding.appName}</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter leading-none mb-2">Selamat Datang</h1>
+          <p className="text-sm font-medium text-gray-500">Silakan login ke sistem {branding.appName}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="NISN / ID" placeholder="Masukkan ID anda" value={id} onChange={(e: any) => setId(e.target.value)} required />
-          <Input label="Password" type="password" placeholder="••••••••" value={pass} onChange={(e: any) => setPass(e.target.value)} required />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Input label="NISN / ID USER" placeholder="Masukkan ID anda" value={id} onChange={(e: any) => setId(e.target.value)} required />
+          <Input label="PASSWORD" type="password" placeholder="••••••••" value={pass} onChange={(e: any) => setPass(e.target.value)} required />
           
-          {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
+          {error && (
+            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-bold text-center">
+              {error}
+            </motion.div>
+          )}
           
-          <Button type="submit" className="w-full h-12 mt-4" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login Sekarang'}
+          <Button type="submit" className="w-full h-14 text-lg mt-4 shadow-xl shadow-blue-500/20" disabled={loading}>
+            {loading ? 'Memverifikasi...' : 'Masuk Ke Sistem'}
           </Button>
         </form>
+        
+        <div className="mt-8 pt-8 border-t border-gray-50 text-center">
+           <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">© 2024 {branding.appName} • Smart Attendance System</p>
+        </div>
       </Card>
     </div>
   );
@@ -1919,6 +2079,128 @@ function JadwalRow({ jam, matkul, guru }: any) {
   );
 }
 
+function CustomUIPage({ branding, setBranding, showMsg }: any) {
+  const [loading, setLoading] = useState(false);
+
+  const updateTheme = async (color: string) => {
+    setLoading(true);
+    const nextBranding = { ...branding, themeColor: color };
+    const res = await api.updateBranding(nextBranding);
+    setLoading(false);
+    if (res.success) {
+      setBranding(nextBranding);
+      showMsg('Tema Berhasil Diubah!');
+    }
+  };
+
+  const updateUIStyle = async (newStyle: any) => {
+    setLoading(true);
+    const nextBranding = { ...branding, uiStyle: newStyle };
+    const res = await api.updateBranding(nextBranding);
+    setLoading(false);
+    if (res.success) {
+      setBranding(nextBranding);
+      showMsg('Desain UI Berhasil Diperbarui!');
+    }
+  };
+
+  // Generate 1000 UI Layout variations
+  const uiVariations = React.useMemo(() => {
+    const vars = [];
+    const fonts = ['sans', 'serif', 'mono'] as const;
+    const shadows = ['soft', 'medium', 'hard', 'glow'] as const;
+    for (let i = 0; i < 1000; i++) {
+      vars.push({
+        radius: (i % 48),
+        borderWidth: (i % 3 === 0 ? 0 : i % 3),
+        shadowIntensity: shadows[i % 4],
+        glassBlur: i > 850 ? (i % 15) : 0,
+        bgOpacity: i > 950 ? 0.75 : 1,
+        fontFamily: fonts[i % 3],
+        spacing: i % 2 === 0 ? 'default' : (i % 3 === 0 ? 'tight' : 'loose')
+      });
+    }
+    return vars;
+  }, []);
+
+  // Generate 900 color variations
+  const themeColors = React.useMemo(() => {
+    const caps = [];
+    for (let i = 0; i < 30; i++) {
+      const h = (360 / 30) * i;
+      for (let j = 0; j < 30; j++) {
+        const l = 20 + (j / 30) * 60;
+        caps.push(`hsl(${h}, 70%, ${l}%)`);
+      }
+    }
+    return caps;
+  }, []);
+
+  return (
+    <div className="space-y-8 pb-32">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Kustomisasi Tampilan</h2>
+        <p className="text-gray-500 font-medium">Bentuk identitas visual aplikasi Anda dengan jutaan kombinasi layout dan warna.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card title="Ganti Layout UI (1000 Pilihan)" className="border-2 border-emerald-50 h-fit">
+           <p className="text-xs text-gray-500 mb-4 font-medium">Klik pada salah satu varian di bawah untuk mengubah seluruh karakter visual aplikasi secara instan.</p>
+           <div className="h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-10 gap-2">
+                {uiVariations.map((style, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => updateUIStyle(style)}
+                    className={cn(
+                      "aspect-square rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-[8px] font-black hover:border-emerald-400 hover:bg-emerald-50 transition-all",
+                      JSON.stringify(branding.uiStyle) === JSON.stringify(style) && "border-emerald-500 bg-emerald-500 text-white border-solid scale-110 shadow-lg shadow-emerald-500/20"
+                    )}
+                    title={`Variant ${idx + 1}`}
+                  >
+                    V{idx + 1}
+                  </button>
+                ))}
+              </div>
+           </div>
+        </Card>
+
+        <Card title="Ganti Tema Warna (900 Pilihan)" className="border-2 border-purple-50 h-fit">
+           <p className="text-xs text-gray-500 mb-4 font-medium">Pilih warna yang paling sesuai dengan identitas sekolah atau instansi Anda.</p>
+           <div className="h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-15 gap-1.5 px-0.5">
+                {themeColors.map((color, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => updateTheme(color)}
+                    className={cn(
+                      "w-full pt-[100%] rounded-md transition-transform hover:scale-150 hover:z-20 shadow-sm border border-black/5",
+                      branding.themeColor === color && "ring-2 ring-black ring-offset-2 scale-110 z-10"
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+           </div>
+        </Card>
+      </div>
+
+      <div className="p-8 bg-blue-600 rounded-[2.5rem] text-white flex flex-col md:flex-row items-center gap-8 shadow-2xl shadow-blue-500/20">
+         <div className="w-20 h-20 bg-white/20 rounded-3xl backdrop-blur-xl flex items-center justify-center">
+            <Palette size={40} className="text-white" />
+         </div>
+         <div>
+            <h3 className="text-2xl font-black mb-1">Mesin Desain Cerdas</h3>
+            <p className="text-blue-100 font-medium">Semua perubahan diterapkan secara real-time ke seluruh pengguna sistem tanpa perlu memuat ulang halaman.</p>
+         </div>
+         <div className="md:ml-auto">
+            <div className="px-6 py-3 bg-white text-blue-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl">Desain Aktif</div>
+         </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPage({ user, branding, setBranding, showMsg, showStatus, onLogout }: any) {
   const [oldPass, setOldPass] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -1948,13 +2230,13 @@ function SettingsPage({ user, branding, setBranding, showMsg, showStatus, onLogo
   };
 
   const handleUpdateBranding = async (e: any) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
-    const res = await api.updateBranding({ appName, logoUrl, announcements: anns });
+    const res = await api.updateBranding({ ...branding, appName, logoUrl, announcements: anns });
     setLoading(false);
     if (res.success) {
-      setBranding({ appName, logoUrl, announcements: anns });
-      showStatus('Branding Diperbarui', 'Nama aplikasi, logo, dan pengumuman telah disimpan.', 'success');
+      setBranding({ ...branding, appName, logoUrl, announcements: anns });
+      showStatus('Sistem Diperbarui', 'Pengaturan branding dan pengumuman telah disimpan.', 'success');
     }
   };
 
