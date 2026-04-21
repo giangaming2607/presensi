@@ -371,16 +371,17 @@ export default function App() {
 
   const showStatus = (title: string, message: string, type: 'success' | 'error' = 'success') => {
     setStatusModal({ show: true, type, title, message });
-    if (type === 'success') {
-      setTimeout(() => setStatusModal(prev => ({ ...prev, show: false })), 3000);
-    }
+    setTimeout(() => setStatusModal(prev => ({ ...prev, show: false })), 3000);
   };
 
   if (!currentUser) {
-    return <Login onLogin={(u) => {
-      setCurrentUser(u);
-      localStorage.setItem('user', JSON.stringify(u));
-    }} />;
+    return <Login 
+      branding={branding}
+      onLogin={(u) => {
+        setCurrentUser(u);
+        localStorage.setItem('user', JSON.stringify(u));
+      }} 
+    />;
   }
 
   const logout = () => {
@@ -621,7 +622,7 @@ function NavBtn({ icon, label, active, onClick }: any) {
 
 // --- LOGIC COMPONENTS ---
 
-function Login({ onLogin }: { onLogin: (u: User) => void }) {
+function Login({ onLogin, branding }: { onLogin: (u: User) => void, branding: any }) {
   const [id, setId] = useState('');
   const [pass, setPass] = useState('');
   const [loading, setLoading] = useState(false);
@@ -644,11 +645,17 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-200 mx-auto mb-4">
-            <GraduationCap size={32} />
+          <div className="mb-4">
+            {branding.logoUrl ? (
+              <img src={branding.logoUrl} alt="Logo" className="w-16 h-16 mx-auto object-contain rounded-2xl shadow-xl shadow-blue-100" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-200 mx-auto">
+                <GraduationCap size={32} />
+              </div>
+            )}
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Selamat Datang</h1>
-          <p className="text-gray-500">Silakan login ke sistem EduAbsen</p>
+          <p className="text-gray-500">Silakan login ke sistem {branding.appName}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
