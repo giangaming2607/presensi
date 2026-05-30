@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogIn, User as UserIcon, QrCode, Scan, Users, BookOpen, GraduationCap, ChevronRight, LogOut, LayoutDashboard, Calendar, Download, Printer, Trash2, Keyboard, FileSpreadsheet, Settings, RotateCcw, Palette, Image as ImageIcon, RefreshCw, Menu, X, Check, CircleX } from 'lucide-react';
+import { LogIn, User as UserIcon, QrCode, Scan, Users, BookOpen, GraduationCap, ChevronRight, LogOut, LayoutDashboard, Calendar, Download, Printer, Trash2, Keyboard, FileSpreadsheet, Settings, RotateCcw, Palette, Image as ImageIcon, RefreshCw, Menu, X, Check, CircleX, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import QRCode from 'react-qr-code';
@@ -109,7 +109,7 @@ const api = {
       if (mode === 'pulang') {
         if (existing.jamPulang) return { success: false, message: 'Siswa sudah absen pulang' };
         await updateDoc(docRef, { jamPulang: now });
-        return { success: true, action: 'pulang', data: { ...existing, jamPulang: now } };
+        return { success: true, action: 'pulang', student, data: { ...existing, jamPulang: now } };
       }
     } else {
       if (mode === 'pulang') return { success: false, message: 'Siswa belum absen masuk' };
@@ -122,7 +122,7 @@ const api = {
         jamPulang: null
       };
       const docRef = await addDoc(collection(db, 'absensi'), newEntry);
-      return { success: true, action: 'masuk', data: { ...newEntry, id: docRef.id } };
+      return { success: true, action: 'masuk', student, data: { ...newEntry, id: docRef.id } };
     }
   },
   addUser: async (user: any) => {
@@ -156,6 +156,11 @@ const api = {
       logoUrl: '', 
       announcements: [], 
       themeColor: '#2563eb',
+      waTemplateMasuk: 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].',
+      waTemplatePulang: 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].',
+      telegramBotToken: '',
+      tgTemplateMasuk: 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].',
+      tgTemplatePulang: 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].',
       uiStyle: {
         radius: 24,
         borderWidth: 1,
@@ -201,6 +206,11 @@ const api = {
       logoUrl: data.logoUrl,
       announcements: data.announcements || [],
       themeColor: data.themeColor || '#2563eb',
+      waTemplateMasuk: data.waTemplateMasuk || 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].',
+      waTemplatePulang: data.waTemplatePulang || 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].',
+      telegramBotToken: data.telegramBotToken || '',
+      tgTemplateMasuk: data.tgTemplateMasuk || 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].',
+      tgTemplatePulang: data.tgTemplatePulang || 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].',
       uiStyle: data.uiStyle || {
         radius: 24,
         borderWidth: 1,
@@ -575,6 +585,7 @@ export default function App() {
               <NavBtn icon={<Users size={20} />} label="Data Siswa" active={activeTab === 'siswa'} onClick={() => setActiveTab('siswa')} />
               <NavBtn icon={<QrCode size={20} />} label="Cetak QR" active={activeTab === 'print_qr'} onClick={() => setActiveTab('print_qr')} />
               <NavBtn icon={<Palette size={20} />} label="Custom UI" active={activeTab === 'custom_ui'} onClick={() => setActiveTab('custom_ui')} />
+              <NavBtn icon={<MessageCircle size={20} />} label="Pengaturan Notif" active={activeTab === 'wa_settings'} onClick={() => setActiveTab('wa_settings')} />
               <NavBtn icon={<Calendar size={20} />} label="Data Absensi" active={activeTab === 'absensi'} onClick={() => setActiveTab('absensi')} />
               <NavBtn icon={<BookOpen size={20} />} label="Laporan Mapel" active={activeTab === 'subject_absensi_admin'} onClick={() => setActiveTab('subject_absensi_admin')} />
               <NavBtn icon={<Settings size={20} />} label="Data Master" active={activeTab === 'master'} onClick={() => setActiveTab('master')} />
@@ -657,6 +668,7 @@ export default function App() {
               <NavBtn icon={<Users size={20} />} label="Data Siswa" active={activeTab === 'siswa'} onClick={() => { setActiveTab('siswa'); setSidebarOpen(false); }} />
               <NavBtn icon={<QrCode size={20} />} label="Cetak QR" active={activeTab === 'print_qr'} onClick={() => { setActiveTab('print_qr'); setSidebarOpen(false); }} />
               <NavBtn icon={<Palette size={20} />} label="Custom UI" active={activeTab === 'custom_ui'} onClick={() => { setActiveTab('custom_ui'); setSidebarOpen(false); }} />
+              <NavBtn icon={<MessageCircle size={20} />} label="Pengaturan Notif" active={activeTab === 'wa_settings'} onClick={() => { setActiveTab('wa_settings'); setSidebarOpen(false); }} />
               <NavBtn icon={<Calendar size={20} />} label="Data Absensi" active={activeTab === 'absensi'} onClick={() => { setActiveTab('absensi'); setSidebarOpen(false); }} />
               <NavBtn icon={<BookOpen size={20} />} label="Laporan Mapel" active={activeTab === 'subject_absensi_admin'} onClick={() => { setActiveTab('subject_absensi_admin'); setSidebarOpen(false); }} />
               <NavBtn icon={<Settings size={20} />} label="Data Master" active={activeTab === 'master'} onClick={() => { setActiveTab('master'); setSidebarOpen(false); }} />
@@ -729,6 +741,7 @@ export default function App() {
             {activeTab === 'subject_absensi_admin' && <SubjectAttendanceAdminView />}
             {activeTab === 'master' && <DataMaster showMsg={showMsg} showStatus={showStatus} />}
             {activeTab === 'custom_ui' && <CustomUIPage branding={branding} setBranding={setBranding} showMsg={showMsg} />}
+            {activeTab === 'wa_settings' && <NotifSettingsPage branding={branding} setBranding={setBranding} showMsg={showMsg} showStatus={showStatus} />}
             {activeTab === 'scanner' && <ScannerPage showMsg={showMsg} showStatus={showStatus} branding={branding} />}
             {activeTab === 'myqr' && <StudentQR user={currentUser} branding={branding} />}
             {activeTab === 'settings' && <SettingsPage user={currentUser} branding={branding} setBranding={setBranding} showMsg={showMsg} showStatus={showStatus} onLogout={logout} />}
@@ -1136,7 +1149,8 @@ function TeacherAbsen({ user, showMsg, showStatus }: { user: User, showMsg: any,
 }
 
 function Dashboard({ user, branding }: { user: User, branding: any }) {
-  const [stats, setStats] = useState({ totalSiswa: 0, absenHariIni: 0 });
+  const [stats, setStats] = useState({ totalSiswa: 0, absenHariIni: 0, guruAktif: 0, efisiensi: '0%' });
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchStats = async () => {
@@ -1145,10 +1159,28 @@ function Dashboard({ user, branding }: { user: User, branding: any }) {
       const users = await api.getUsers();
       const absensi = await api.getAbsensi();
       const today = new Date().toISOString().split('T')[0];
+      
+      const totalSiswa = users.filter((u: any) => u.role === 'Siswa').length;
+      const absenToday = absensi.filter((a: any) => a.tanggal === today);
+      const efisiensiValue = totalSiswa > 0 ? Math.round((absenToday.length / totalSiswa) * 100) : 0;
+
       setStats({
-        totalSiswa: users.filter((u: any) => u.role === 'Siswa').length,
-        absenHariIni: absensi.filter((a: any) => a.tanggal === today).length
+        totalSiswa,
+        absenHariIni: absenToday.length,
+        guruAktif: users.filter((u: any) => u.role === 'Guru').length,
+        efisiensi: `${efisiensiValue}%`
       });
+
+      // Map recent attendance to activity items
+      const recent = absensi.slice(0, 5).map(a => ({
+        time: a.jamMasuk.split(' ')[0], // Show just time part
+        action: a.jamPulang ? 'Absen Pulang' : 'Absen Masuk',
+        user: a.nama,
+        role: 'Siswa',
+        color: a.jamPulang ? 'bg-orange-500' : 'bg-green-500'
+      }));
+      setRecentActivity(recent);
+
     } finally {
       setLoading(false);
     }
@@ -1191,16 +1223,17 @@ function Dashboard({ user, branding }: { user: User, branding: any }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Total Siswa" value={stats.totalSiswa} icon={<Users className="text-blue-600" />} color="bg-blue-50" />
         <StatCard label="Kehadiran" value={stats.absenHariIni} icon={<GraduationCap className="text-emerald-600" />} color="bg-emerald-50" />
-        <StatCard label="Guru Aktif" value="12" icon={<UserIcon className="text-violet-600" />} color="bg-violet-50" />
-        <StatCard label="Efisiensi" value="95%" icon={<Calendar className="text-amber-600" />} color="bg-amber-50" />
+        <StatCard label="Guru Aktif" value={stats.guruAktif} icon={<UserIcon className="text-violet-600" />} color="bg-violet-50" />
+        <StatCard label="Efisiensi" value={stats.efisiensi} icon={<Calendar className="text-amber-600" />} color="bg-amber-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card title="Aktivitas Terbaru" className="lg:col-span-2">
           <div className="space-y-6">
-             <ActivityItem time="08:15" action="Absen Masuk" user="Siswa A" role="Siswa" color="bg-green-500" />
-             <ActivityItem time="08:12" action="Absen Masuk" user="Siswa B" role="Siswa" color="bg-blue-500" />
-             <ActivityItem time="08:05" action="Login Sistem" user="Admin" role="Administrator" color="bg-purple-500" />
+             {recentActivity.map((act, i) => (
+                <ActivityItem key={i} {...act} />
+             ))}
+             {recentActivity.length === 0 && <p className="text-center py-8 text-gray-400 italic">Belum ada aktivitas hari ini.</p>}
           </div>
         </Card>
 
@@ -1276,6 +1309,8 @@ function AdminStudents({ showMsg, showStatus }: any) {
   const [nama, setNama] = useState('');
   const [kelas, setKelas] = useState('');
   const [password, setPassword] = useState('123');
+  const [parentPhone, setParentPhone] = useState('');
+  const [parentTelegramId, setParentTelegramId] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -1294,7 +1329,7 @@ function AdminStudents({ showMsg, showStatus }: any) {
   const handleSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    const studentData = { id: nisn, nama, kelas, role: 'Siswa', password };
+    const studentData = { id: nisn, nama, kelas, role: 'Siswa', password, parentPhone, parentTelegramId };
     
     let res;
     if (editingId) {
@@ -1305,7 +1340,7 @@ function AdminStudents({ showMsg, showStatus }: any) {
 
     if (res.success) {
       showStatus('Berhasil', editingId ? 'Data siswa diperbarui' : 'Siswa berhasil ditambahkan', 'success');
-      setNisn(''); setNama(''); setKelas(''); setPassword('123'); setEditingId(null);
+      setNisn(''); setNama(''); setKelas(''); setPassword('123'); setParentPhone(''); setParentTelegramId(''); setEditingId(null);
       fetchStudents();
     } else {
       showMsg(res.message, 'error');
@@ -1319,6 +1354,8 @@ function AdminStudents({ showMsg, showStatus }: any) {
     setNama(s.nama);
     setKelas(s.kelas || '');
     setPassword(s.password || '123');
+    setParentPhone(s.parentPhone || '');
+    setParentTelegramId(s.parentTelegramId || '');
   };
 
   const deleteStudent = async (id: string) => {
@@ -1339,14 +1376,16 @@ function AdminStudents({ showMsg, showStatus }: any) {
       </div>
       
       <Card title={editingId ? "Edit Data Siswa" : "Tambah Siswa Baru"}>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
           <Input label="NISN" value={nisn} onChange={(e: any) => setNisn(e.target.value)} required disabled={!!editingId} />
           <Input label="Nama Lengkap" value={nama} onChange={(e: any) => setNama(e.target.value)} required />
           <Input label="Kelas" value={kelas} onChange={(e: any) => setKelas(e.target.value)} required />
           <Input label="Password" type="password" value={password} onChange={(e: any) => setPassword(e.target.value)} required />
+          <Input label="No. WA Ortu" placeholder="628..." value={parentPhone} onChange={(e: any) => setParentPhone(e.target.value)} />
+          <Input label="Telegram Chat ID" placeholder="123456789" value={parentTelegramId} onChange={(e: any) => setParentTelegramId(e.target.value)} />
           <div className="flex gap-2">
             <Button type="submit" disabled={loading} className="h-12 flex-1">{editingId ? 'Simpan' : 'Tambah'}</Button>
-            {editingId && <Button variant="secondary" onClick={() => { setEditingId(null); setNisn(''); setNama(''); setKelas(''); setPassword('123'); }} className="h-12">Batal</Button>}
+            {editingId && <Button variant="secondary" onClick={() => { setEditingId(null); setNisn(''); setNama(''); setKelas(''); setPassword('123'); setParentPhone(''); setParentTelegramId(''); }} className="h-12">Batal</Button>}
           </div>
         </form>
       </Card>
@@ -1359,6 +1398,8 @@ function AdminStudents({ showMsg, showStatus }: any) {
                 <th className="py-4 px-2">NISN</th>
                 <th className="py-4 px-2">Nama</th>
                 <th className="py-4 px-2">Kelas</th>
+                <th className="py-4 px-2">WA Ortu</th>
+                <th className="py-4 px-2">Telegram ID</th>
                 <th className="py-4 px-2 text-center">Aksi</th>
               </tr>
             </thead>
@@ -1368,6 +1409,8 @@ function AdminStudents({ showMsg, showStatus }: any) {
                   <td className="py-4 px-2 font-mono">{s.id}</td>
                   <td className="py-4 px-2 font-medium">{s.nama}</td>
                   <td className="py-4 px-2">{s.kelas}</td>
+                  <td className="py-4 px-2 text-gray-500">{s.parentPhone || '-'}</td>
+                  <td className="py-4 px-2 text-gray-500">{s.parentTelegramId || '-'}</td>
                   <td className="py-4 px-2">
                     <div className="flex justify-center gap-2">
                       <button onClick={() => startEdit(s)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">Edit</button>
@@ -1860,12 +1903,56 @@ function ScannerPage({ showMsg, showStatus, branding }: any) {
     if (res.success) {
       playSound('success');
       const actionText = res.action === 'masuk' ? 'Masuk' : 'Pulang';
-      const detailMsg = `Siswa: ${res.data.nama}\nNISN: ${nisn}\nJam: ${res.action === 'masuk' ? res.data.jamMasuk : res.data.jamPulang}`;
+      const time = res.action === 'masuk' ? res.data.jamMasuk : res.data.jamPulang;
+      const detailMsg = `Siswa: ${res.data.nama}\nNISN: ${nisn}\nJam: ${time}`;
+      
       showStatus(`Absen ${actionText} Berhasil`, detailMsg, 'success');
       speak(`Absen ${actionText} berhasil untuk ${res.data.nama}`);
-      setLastResult({ type: 'success', name: res.data.nama, nisn, action: res.action, time: res.action === 'masuk' ? res.data.jamMasuk : res.data.jamPulang });
+      setLastResult({ type: 'success', name: res.data.nama, nisn, action: res.action, time });
       fetchRecent();
       setManualNisn('');
+
+      // Kirim WhatsApp
+      if (res.student && res.student.parentPhone) {
+        let template = res.action === 'masuk' 
+          ? (branding.waTemplateMasuk || 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].') 
+          : (branding.waTemplatePulang || 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].');
+        
+        const message = template
+          .replace(/\[NAMA\]/g, res.data.nama)
+          .replace(/\[WAKTU\]/g, time)
+          .replace(/\[STATUS\]/g, 'Hadir');
+        
+        let phone = res.student.parentPhone;
+        // membersihkan nomor dan memastikan format 62
+        phone = phone.replace(/[^0-9]/g, '');
+        if (phone.startsWith('0')) phone = '62' + phone.substring(1);
+        
+        // Membuka WA Web di tab baru
+        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`, '_blank');
+      }
+
+      // Kirim Telegram (Latar Belakang)
+      if (branding.telegramBotToken && res.student && res.student.parentTelegramId) {
+        let tgTemplate = res.action === 'masuk' 
+          ? (branding.tgTemplateMasuk || 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].') 
+          : (branding.tgTemplatePulang || 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].');
+        
+        const textMessage = tgTemplate
+          .replace(/\[NAMA\]/g, res.data.nama)
+          .replace(/\[WAKTU\]/g, time)
+          .replace(/\[STATUS\]/g, 'Hadir');
+
+        fetch(`https://api.telegram.org/bot${branding.telegramBotToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: res.student.parentTelegramId,
+            text: textMessage
+          })
+        }).catch(err => console.error("Gagal mengirim Telegram", err));
+      }
+
     } else {
       playSound('error');
       showStatus('Absen Gagal', res.message, 'error');
@@ -2024,6 +2111,40 @@ function ScannerPage({ showMsg, showStatus, branding }: any) {
 }
 
 function StudentQR({ user, branding }: { user: User, branding: any }) {
+  const [schedules, setSchedules] = useState<{ jam: string; matkul: string; guru: string; hari: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      setLoading(true);
+      try {
+        const teachers = (await api.getUsers()).filter(u => u.role === 'Guru');
+        const mySchedule: any[] = [];
+        const todayDay = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(new Date());
+
+        teachers.forEach(teacher => {
+          (teacher.jadwal || []).forEach(j => {
+            if (j.kelas === user.kelas) {
+              mySchedule.push({
+                jam: j.jam,
+                matkul: teacher.mapel,
+                guru: teacher.nama,
+                hari: j.hari
+              });
+            }
+          });
+        });
+
+        // Sort by jam and filter by today if needed, but usually we show all for the week or specify
+        // For now, let's just show all schedules for this class
+        setSchedules(mySchedule.sort((a, b) => a.jam.localeCompare(b.jam)));
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSchedules();
+  }, [user.kelas]);
+
   return (
     <div className="space-y-8 pb-32">
       <div className="flex items-center justify-between">
@@ -2055,21 +2176,30 @@ function StudentQR({ user, branding }: { user: User, branding: any }) {
         <AnnouncementList announcements={branding.announcements} />
       </div>
 
-      <Card title="Jadwal Pelajaran Hari Ini">
+      <Card title="Jadwal Pelajaran Kelas Anda">
         <div className="space-y-1">
-          <JadwalRow jam="07:30 - 09:00" matkul="Matematika" guru="Budi Santoso" />
-          <JadwalRow jam="09:00 - 10:30" matkul="Bhs. Indonesia" guru="Siti Aminah" />
-          <JadwalRow jam="11:00 - 12:30" matkul="Fisika" guru="Rahmat Hidayat" />
+          {loading ? (
+            <p className="text-center py-8 text-gray-400 animate-pulse">Memuat jadwal...</p>
+          ) : schedules.length > 0 ? (
+            schedules.map((s, i) => (
+              <JadwalRow key={i} jam={s.jam} matkul={s.matkul} guru={s.guru} hari={s.hari} />
+            ))
+          ) : (
+            <p className="text-center py-12 text-gray-400 italic">Belum ada jadwal untuk kelas {user.kelas}.</p>
+          )}
         </div>
       </Card>
     </div>
   );
 }
 
-function JadwalRow({ jam, matkul, guru }: any) {
+function JadwalRow({ jam, matkul, guru, hari }: any) {
   return (
     <div className="flex items-center gap-4 p-4 border-b last:border-0 hover:bg-gray-50 transition-colors">
-       <span className="text-sm font-mono text-blue-600 font-bold whitespace-nowrap">{jam}</span>
+       <div className="flex flex-col min-w-[100px]">
+         <span className="text-sm font-mono text-blue-600 font-bold">{jam}</span>
+         {hari && <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{hari}</span>}
+       </div>
        <div className="flex-1">
          <p className="font-bold text-gray-900">{matkul}</p>
          <p className="text-xs text-gray-500">{guru}</p>
@@ -2360,6 +2490,110 @@ function SettingsPage({ user, branding, setBranding, showMsg, showStatus, onLogo
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function NotifSettingsPage({ branding, setBranding, showMsg, showStatus }: any) {
+  const [waTemplateMasuk, setWaTemplateMasuk] = useState(branding.waTemplateMasuk || 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].');
+  const [waTemplatePulang, setWaTemplatePulang] = useState(branding.waTemplatePulang || 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].');
+  const [telegramBotToken, setTelegramBotToken] = useState(branding.telegramBotToken || '');
+  const [tgTemplateMasuk, setTgTemplateMasuk] = useState(branding.tgTemplateMasuk || 'Halo Orang Tua [NAMA], anak Anda telah Absen Masuk pada jam [WAKTU].');
+  const [tgTemplatePulang, setTgTemplatePulang] = useState(branding.tgTemplatePulang || 'Halo Orang Tua [NAMA], anak Anda telah Absen Pulang pada jam [WAKTU].');
+  
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    const nextBranding = { ...branding, waTemplateMasuk, waTemplatePulang, telegramBotToken, tgTemplateMasuk, tgTemplatePulang };
+    const res = await api.updateBranding(nextBranding);
+    setLoading(false);
+    if (res.success) {
+      setBranding(nextBranding);
+      showStatus('Berhasil', 'Pengaturan notifikasi berhasil disimpan.', 'success');
+    } else {
+      showMsg('Terjadi kesalahan', 'error');
+    }
+  };
+
+  return (
+    <div className="space-y-8 pb-32">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Pengaturan Notifikasi</h2>
+        <p className="text-gray-500 font-medium">Ubah template pesan yang akan dikirim secara otomatis ke WA/Telegram orang tua saat siswa melakukan absen.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <Card title="Format Pesan WhatsApp (wa.me)">
+          <div className="mb-6 p-4 bg-green-50 text-green-800 rounded-xl text-sm border border-green-100 flex gap-3">
+             <MessageCircle size={24} className="flex-shrink-0" />
+             <p>Variabel yang bisa digunakan:<br/><b>[NAMA]</b> - Nama Lengkap Siswa<br/><b>[WAKTU]</b> - Jam Absen<br/><b>[STATUS]</b> - Status Absen (Hadir, dsb.)</p>
+          </div>
+          
+          <div className="space-y-6 max-w-2xl">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-2">Template WA Absen Masuk</label>
+              <textarea 
+                 value={waTemplateMasuk} 
+                 onChange={(e) => setWaTemplateMasuk(e.target.value)} 
+                 className="w-full h-24 bg-gray-50 border border-gray-200 rounded-[calc(var(--ui-radius)/1.5)] p-4 font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-2">Template WA Absen Pulang</label>
+              <textarea 
+                 value={waTemplatePulang} 
+                 onChange={(e) => setWaTemplatePulang(e.target.value)} 
+                 className="w-full h-24 bg-gray-50 border border-gray-200 rounded-[calc(var(--ui-radius)/1.5)] p-4 font-medium focus:outline-none focus:ring-2 focus:ring-green-500/20"
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Pengaturan Telegram Bot">
+          <div className="mb-6 p-4 bg-blue-50 text-blue-800 rounded-xl text-sm border border-blue-100 flex gap-3">
+             <MessageCircle size={24} className="flex-shrink-0" />
+             <p>Pesan otomatis latar belakang. Pastikan Anda mengatur <b>HTTP API Token Bot</b>. Lihat file tutorial untuk cara membuat bot.</p>
+          </div>
+          
+          <div className="space-y-6 max-w-2xl">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-2">HTTP API Token (Dari BotFather)</label>
+              <input 
+                 type="text"
+                 placeholder="Misal: 123456789:ABCDefGhIjKlMnOpQrStUvWxYz"
+                 value={telegramBotToken} 
+                 onChange={(e) => setTelegramBotToken(e.target.value)} 
+                 className="w-full h-12 bg-gray-50 border border-gray-200 rounded-[calc(var(--ui-radius)/1.5)] px-4 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-2">Template Telegram Absen Masuk</label>
+              <textarea 
+                 value={tgTemplateMasuk} 
+                 onChange={(e) => setTgTemplateMasuk(e.target.value)} 
+                 className="w-full h-24 bg-gray-50 border border-gray-200 rounded-[calc(var(--ui-radius)/1.5)] p-4 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-2">Template Telegram Absen Pulang</label>
+              <textarea 
+                 value={tgTemplatePulang} 
+                 onChange={(e) => setTgTemplatePulang(e.target.value)} 
+                 className="w-full h-24 bg-gray-50 border border-gray-200 rounded-[calc(var(--ui-radius)/1.5)] p-4 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Button type="submit" disabled={loading} className="w-full md:w-auto px-8 h-12 shadow-md hover:shadow-lg transition-shadow">
+           {loading ? 'Menyimpan...' : 'Simpan Pengaturan Notifikasi'}
+        </Button>
+      </form>
     </div>
   );
 }

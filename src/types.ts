@@ -11,6 +11,8 @@ export interface User {
   kelas?: string;
   role: UserRole;
   password?: string;
+  parentPhone?: string; // WhatsApp Number
+  parentTelegramId?: string; // Telegram Chat ID
   mapel?: string;
   jadwal?: { kelas: string; hari: string; jam: string }[];
 }
